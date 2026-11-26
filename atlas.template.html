@@ -1,0 +1,1826 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <meta name="theme-color" content="#fbfaf7" />
+    <title>Patchbay Atlas — Git history, mapped</title>
+    <style>
+      :root {
+        color-scheme: light;
+        --sea: #e8f1f8;
+        --surface: #fffefa;
+        --panel: #fbfaf7;
+        --line: #c3ceda;
+        --fine: #dee4ea;
+        --text: #182944;
+        --quiet: #475c72;
+        --accent: #ac3626;
+        --indigo: #324e87;
+        --mono: Consolas, 'Liberation Mono', monospace;
+        --sans: Inter, 'Segoe UI', Arial, sans-serif;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        background: var(--sea);
+        color: var(--text);
+        font: 14px/1.4 var(--sans);
+      }
+      button,
+      select,
+      input {
+        font: inherit;
+      }
+      button,
+      select {
+        cursor: pointer;
+      }
+      button,
+      a,
+      select {
+        touch-action: manipulation;
+      }
+      button {
+        border: 0;
+        background: transparent;
+        color: inherit;
+      }
+      button:focus-visible,
+      select:focus-visible,
+      input:focus-visible,
+      [tabindex]:focus-visible,
+      a:focus-visible {
+        outline: 2px solid var(--accent);
+        outline-offset: 3px;
+      }
+      button:disabled {
+        opacity: 0.4;
+        cursor: default;
+      }
+      button:hover,
+      a:hover {
+        color: var(--accent);
+      }
+      a {
+        color: inherit;
+        text-decoration: none;
+      }
+      h1,
+      h2,
+      h3,
+      p {
+        margin: 0;
+      }
+      header {
+        height: 61px;
+        border-bottom: 1px solid #b5c4d1;
+        background: #fffefa;
+        position: relative;
+        z-index: 2;
+      }
+      .header-frame {
+        height: 100%;
+        display: flex;
+        align-items: center;
+        padding: 0 22px;
+        gap: 20px;
+      }
+      .brand {
+        display: flex;
+        align-items: center;
+        gap: 9px;
+        white-space: nowrap;
+        font-weight: 700;
+        font-size: 17px;
+        letter-spacing: -0.65px;
+      }
+      .brand svg {
+        color: var(--accent);
+        width: 26px;
+        height: 26px;
+      }
+      .repo-id {
+        border-left: 1px solid var(--line);
+        padding-left: 20px;
+        display: flex;
+        align-items: center;
+        gap: 9px;
+        min-width: 0;
+      }
+      .repo-id h1 {
+        font-size: 15px;
+        letter-spacing: -0.35px;
+        font-weight: 550;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+      .ref {
+        font: 10px var(--mono);
+        color: var(--quiet);
+        overflow: hidden;
+        text-overflow: ellipsis;
+        max-width: 17ch;
+        white-space: nowrap;
+      }
+      .header-right {
+        margin-left: auto;
+        display: flex;
+        align-items: center;
+        gap: 16px;
+        white-space: nowrap;
+        font-size: 12px;
+      }
+      .badge {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        color: #415975;
+        font: 10px var(--mono);
+      }
+      .badge::before {
+        content: '';
+        width: 6px;
+        height: 6px;
+        border-radius: 50%;
+        background: #4a6eab;
+      }
+      .export {
+        background: #263f6a;
+        border: 1px solid #263f6a;
+        border-radius: 4px;
+        padding: 6px 11px;
+        color: #ffffff;
+        font-weight: 650;
+        font-size: 12px;
+      }
+      .export:hover {
+        background: #38598f;
+        color: #ffffff;
+      }
+      .workspace {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) 302px;
+        height: calc(100svh - 61px);
+        min-height: 590px;
+      }
+      .map-panel {
+        position: relative;
+        min-width: 0;
+        overflow: hidden;
+        background: var(--sea);
+      }
+      .map-space {
+        position: absolute;
+        inset: 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background-image: radial-gradient(#b0c5da 0.7px, transparent 0.9px);
+        background-size: 14px 14px;
+      }
+      .map-space > svg {
+        width: 100%;
+        height: 100%;
+        display: block;
+      }
+      .map-top {
+        position: absolute;
+        left: 23px;
+        right: 22px;
+        top: 19px;
+        z-index: 1;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        pointer-events: none;
+      }
+      .map-top > * {
+        pointer-events: auto;
+      }
+      .view-switch {
+        display: flex;
+        align-items: center;
+        padding: 3px;
+        background: #fffffcf5;
+        border: 1px solid #a8b9cb;
+        border-radius: 5px;
+        box-shadow: 0 3px 12px #28466b15;
+      }
+      .view-switch button {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        border-radius: 3px;
+        padding: 6px 10px;
+        font-size: 12px;
+        color: #3e546d;
+      }
+      .view-switch button[aria-pressed='true'] {
+        color: #ffffff;
+        background: #344d76;
+      }
+      .view-switch svg {
+        width: 14px;
+        height: 14px;
+        stroke: currentColor;
+        fill: none;
+        stroke-width: 1.6;
+      }
+      .map-index,
+      .sector-nav,
+      .tag,
+      .facet-title,
+      .small-label {
+        font: 10px/1.4 var(--mono);
+        color: var(--quiet);
+        letter-spacing: 0.09em;
+        text-transform: uppercase;
+      }
+      .map-index {
+        color: #3d5674;
+      }
+      .sector-nav {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+      .sector-nav button,
+      .close {
+        border: 1px solid var(--line);
+        width: 26px;
+        height: 26px;
+        border-radius: 3px;
+        background: var(--surface);
+      }
+      .island {
+        cursor: pointer;
+      }
+      .island:focus-visible {
+        outline: none;
+      }
+      .island:focus-visible .pin,
+      .island:hover .pin {
+        stroke: #a72f25;
+        stroke-width: 3;
+      }
+      .island text {
+        pointer-events: none;
+      }
+      .map-lower {
+        position: absolute;
+        bottom: 20px;
+        left: 23px;
+        right: 23px;
+        display: flex;
+        align-items: flex-end;
+        justify-content: space-between;
+        gap: 14px;
+        pointer-events: none;
+      }
+      .map-lower > * {
+        pointer-events: auto;
+      }
+      .legend {
+        display: flex;
+        flex-direction: column;
+        align-items: flex-end;
+        gap: 4px;
+        color: #3e5674;
+        font: 10px var(--mono);
+      }
+      .legend span {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+      }
+      .legend i {
+        width: 23px;
+        border-top: 1px dashed #536a8c;
+      }
+      .transport {
+        width: min(410px, 61%);
+        padding: 10px 13px;
+        border: 1px solid #a8bbcb;
+        border-radius: 5px;
+        background: #fffefcf5;
+        box-shadow: 0 4px 16px #29466719;
+      }
+      .replay-line {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+      }
+      .replay-line button {
+        padding: 0;
+        white-space: nowrap;
+        color: var(--accent);
+        font: 600 12px var(--sans);
+      }
+      .replay-line input {
+        flex: 1;
+        min-width: 24px;
+        height: 4px;
+        accent-color: var(--accent);
+        cursor: pointer;
+      }
+      .replay-line #exit-replay {
+        font-size: 18px;
+      }
+      .transport #frame-info {
+        max-width: 100%;
+        display: block;
+        text-align: left;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        padding: 6px 0 0;
+        color: #425b74;
+        font: 10px var(--mono);
+      }
+      .transport #frame-info:disabled {
+        opacity: 1;
+      }
+      .transport #frame-info:not(:disabled):hover {
+        text-decoration: underline;
+      }
+      .aside {
+        border-left: 1px solid #acbfd2;
+        background: var(--panel);
+        min-width: 0;
+        overflow: auto;
+      }
+      .aside-section {
+        padding: 19px 20px;
+        border-bottom: 1px solid var(--line);
+      }
+      .survey-title,
+      .section-title,
+      .stat-pair,
+      .sector-row,
+      .aside-foot {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 8px;
+      }
+      .section-title h2,
+      .survey-title h2 {
+        font-size: 14px;
+        letter-spacing: -0.2px;
+        font-weight: 600;
+      }
+      .tag {
+        color: var(--accent);
+        font-size: 9px;
+      }
+      .survey-stats {
+        display: flex;
+        gap: 16px;
+        padding: 12px 0 8px;
+      }
+      .survey-stats b {
+        font-size: 19px;
+        color: var(--text);
+        font-weight: 500;
+        letter-spacing: -1px;
+      }
+      .survey-stats small,
+      .stat-pair small,
+      .axis,
+      .subtle,
+      .hash {
+        font: 10px var(--mono);
+        color: var(--quiet);
+      }
+      .survey-stats small {
+        margin-left: 3px;
+      }
+      .range {
+        color: var(--quiet);
+        font: 10px var(--mono);
+      }
+      .selector {
+        position: relative;
+        margin: 6px 0 11px;
+      }
+      .selector select {
+        display: block;
+        width: 100%;
+        border: 0;
+        border-radius: 0;
+        appearance: none;
+        background: transparent;
+        color: #192e50;
+        padding: 0 22px 4px 0;
+        font: bold 27px/1.3 var(--sans);
+        letter-spacing: -1.2px;
+        text-overflow: ellipsis;
+      }
+      .selector select option {
+        background: #fbfaf7;
+        color: var(--text);
+      }
+      .selector::after {
+        content: '⌄';
+        pointer-events: none;
+        position: absolute;
+        right: 1px;
+        top: 2px;
+        color: var(--quiet);
+      }
+      .stat-pair {
+        justify-content: flex-start;
+        gap: 26px;
+      }
+      .stat-pair b {
+        font-size: 17px;
+        font-weight: 550;
+        display: block;
+      }
+      .stat-pair small {
+        color: #4e6277;
+      }
+      .spark {
+        margin: 15px 0 2px;
+      }
+      .bars {
+        height: 30px;
+        display: flex;
+        align-items: flex-end;
+        gap: 3px;
+      }
+      .bars i {
+        flex: 1;
+        min-width: 1px;
+        background: #6b88b1;
+        opacity: 0.88;
+      }
+      .axis {
+        display: flex;
+        justify-content: space-between;
+        font-size: 9px;
+        margin-top: 5px;
+      }
+      .commit-list {
+        display: grid;
+        gap: 0;
+        margin-top: 7px;
+      }
+      .commit-btn {
+        text-align: left;
+        display: grid;
+        gap: 4px;
+        padding: 8px 0;
+        border-bottom: 1px solid var(--fine);
+        min-width: 0;
+      }
+      .commit-btn .subject {
+        white-space: nowrap;
+        text-overflow: ellipsis;
+        overflow: hidden;
+        font-size: 12px;
+      }
+      .hash {
+        color: #536583;
+      }
+      .log-btn {
+        padding: 0;
+        color: var(--accent);
+        font: 11px var(--mono);
+      }
+      .sector-ranks {
+        margin-top: 9px;
+      }
+      .sector-row {
+        width: 100%;
+        padding: 4px 0;
+        gap: 7px;
+        font: 11px var(--mono);
+      }
+      .sector-row[aria-pressed='true'] {
+        color: var(--accent);
+      }
+      .sector-row span:first-child {
+        width: 82px;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        text-align: left;
+      }
+      .rank-track {
+        flex: 1;
+        height: 3px;
+        background: #dce3ed;
+      }
+      .rank-track i {
+        display: block;
+        height: 100%;
+        background: #809bc0;
+      }
+      .sector-row[aria-pressed='true'] .rank-track i {
+        background: var(--accent);
+      }
+      .sector-row span:last-child {
+        min-width: 22px;
+        text-align: right;
+        color: var(--quiet);
+      }
+      .aside-foot {
+        align-items: flex-start;
+        padding: 16px 20px;
+        color: var(--quiet);
+        font: 10px/1.6 var(--mono);
+      }
+      .aside-foot a {
+        color: #233b67;
+      }
+      .timeline {
+        position: absolute;
+        inset: 69px 20px 64px;
+        overflow: auto;
+        background: var(--surface);
+        border: 1px solid var(--line);
+        border-radius: 4px;
+        padding: 12px;
+      }
+      .timeline-header {
+        position: sticky;
+        top: -12px;
+        padding: 0 0 10px;
+        background: var(--surface);
+        z-index: 1;
+      }
+      .timeline input {
+        width: 100%;
+        padding: 8px 10px;
+        background: #f7f9fc;
+        border: 1px solid var(--line);
+        border-radius: 3px;
+        color: var(--text);
+      }
+      .time-row {
+        display: grid;
+        grid-template-columns: 70px minmax(0, 1fr) 70px;
+        text-align: left;
+        width: 100%;
+        align-items: baseline;
+        gap: 10px;
+        padding: 9px 0;
+        border-bottom: 1px solid var(--fine);
+      }
+      .time-row .subject {
+        overflow-wrap: anywhere;
+      }
+      .empty {
+        padding: 18px;
+        color: var(--quiet);
+      }
+      dialog {
+        color: var(--text);
+        background: #fffefa;
+        border: 1px solid #a8b8cb;
+        border-radius: 7px;
+        width: min(630px, calc(100% - 26px));
+        max-height: 83vh;
+        padding: 0;
+        box-shadow: 0 16px 80px #22344e36;
+      }
+      dialog::backdrop {
+        background: #172c4890;
+      }
+      .modal-head {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 14px 20px;
+        border-bottom: 1px solid var(--line);
+      }
+      .modal-body {
+        padding: 22px;
+      }
+      .modal-body h2 {
+        font-size: 25px;
+        letter-spacing: -0.8px;
+        line-height: 1.2;
+        overflow-wrap: anywhere;
+      }
+      .modal-body .metadata {
+        font: 12px var(--mono);
+        color: var(--quiet);
+        margin: 10px 0 20px;
+      }
+      .files {
+        list-style: none;
+        margin: 8px 0 0;
+        padding: 0;
+      }
+      .files li {
+        display: flex;
+        align-items: baseline;
+        justify-content: space-between;
+        gap: 12px;
+        padding: 8px 0;
+        border-top: 1px solid var(--line);
+        font: 12px var(--mono);
+      }
+      .files li span:first-child {
+        overflow-wrap: anywhere;
+        white-space: pre-wrap;
+      }
+      .delta {
+        white-space: nowrap;
+        color: var(--indigo);
+      }
+      [hidden] {
+        display: none !important;
+      }
+      .visually-hidden {
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        margin: -1px;
+        overflow: hidden;
+        clip: rect(0, 0, 0, 0);
+        white-space: nowrap;
+        border: 0;
+      }
+      @media (min-width: 1500px) {
+        .workspace {
+          grid-template-columns: minmax(0, 1fr) 338px;
+        }
+        .aside-section {
+          padding: 23px 24px;
+        }
+      }
+      @media (max-width: 900px) {
+        .workspace {
+          grid-template-columns: minmax(0, 1fr) 250px;
+        }
+        .aside-section {
+          padding: 15px;
+        }
+        .header-frame {
+          gap: 12px;
+          padding: 0 14px;
+        }
+        .repo-id {
+          padding-left: 12px;
+        }
+        .map-top {
+          left: 12px;
+          right: 12px;
+        }
+        .map-lower {
+          left: 12px;
+          right: 12px;
+        }
+        .legend {
+          font-size: 9px;
+        }
+        .survey-stats {
+          gap: 9px;
+        }
+        .aside-foot {
+          padding: 12px;
+        }
+      }
+      @media (max-width: 720px) {
+        header {
+          height: 52px;
+        }
+        .header-frame {
+          gap: 9px;
+        }
+        .brand span {
+          display: none;
+        }
+        .repo-id {
+          padding-left: 9px;
+        }
+        .header-right {
+          gap: 9px;
+        }
+        .header-right > a {
+          display: none;
+        }
+        .workspace {
+          height: auto;
+          display: flex;
+          flex-direction: column;
+          min-height: 0;
+        }
+        .map-panel {
+          height: 63svh;
+          min-height: 403px;
+          max-height: 640px;
+        }
+        .aside {
+          border-left: 0;
+          border-top: 1px solid var(--line);
+          overflow: visible;
+        }
+        .aside-section {
+          padding: 15px 18px;
+        }
+        .map-top {
+          top: 11px;
+        }
+        .map-lower {
+          bottom: 11px;
+        }
+        .transport {
+          width: 66%;
+          padding: 7px 9px;
+        }
+        .legend {
+          gap: 3px;
+          max-width: 32%;
+          text-align: right;
+        }
+        .legend span:last-child {
+          display: none;
+        }
+        .aside-foot {
+          padding: 15px 18px;
+        }
+        .survey-stats {
+          gap: 18px;
+        }
+        .badge {
+          font-size: 9px;
+        }
+        .ref {
+          max-width: 9ch;
+        }
+        .time-row {
+          grid-template-columns: 50px 1fr;
+        }
+        .time-row > .hash {
+          display: none;
+        }
+        .map-index {
+          font-size: 9px;
+        }
+        .timeline {
+          inset: 56px 10px 46px;
+        }
+      }
+      @media (max-width: 390px) {
+        .badge {
+          display: none;
+        }
+        .view-switch button {
+          padding: 5px 7px;
+        }
+        .transport {
+          width: 68%;
+        }
+        .replay-line {
+          gap: 6px;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <div class="header-frame">
+        <div class="brand">
+          <svg aria-hidden="true" viewBox="0 0 40 40" fill="none" stroke="currentColor" stroke-width="1.6">
+            <path d="M3 29 13 10l8-5 10 5 6 20-6 5H11Z" />
+            <path d="m8 28 8-15 6-3 6 4 5 14-5 3H14Z" />
+            <path d="m14 26 6-10 4-1 4 10-4 3Z" /></svg
+          ><span>Patchbay Atlas</span>
+        </div>
+        <div class="repo-id">
+          <h1 id="repo"></h1>
+          <span class="ref" id="ref"></span>
+        </div>
+        <div class="header-right">
+          <span class="badge" id="mode"></span
+          ><a href="https://github.com/saimeeee/patchbay-atlas">GitHub ↗</a
+          ><button class="export" id="export" aria-label="Download map sheet as SVG">Export SVG ↓</button>
+        </div>
+      </div>
+    </header>
+    <main class="workspace">
+      <section class="map-panel" aria-label="Repository map workspace">
+        <div class="map-top">
+          <div class="view-switch" aria-label="Choose view">
+            <button type="button" id="terrain-btn" aria-pressed="true">
+              <svg aria-hidden="true" viewBox="0 0 16 16"><path d="m1 12 5-9 5 8 2-4 2 5z" /></svg
+              >Terrain</button
+            ><button type="button" id="time-btn" aria-pressed="false">
+              <svg aria-hidden="true" viewBox="0 0 16 16"><path d="M3 2v12M6 4h7M6 8h5M6 12h7" /></svg>Commit
+              log
+            </button>
+          </div>
+          <h2 class="visually-hidden" id="view-title">Sector map</h2>
+          <div id="nav" class="sector-nav">
+            <button type="button" id="prev" aria-label="Previous map sheet">←</button><span id="sheet"></span
+            ><button type="button" id="next" aria-label="Next map sheet">→</button>
+          </div>
+          <span class="map-index" id="map-index"></span>
+        </div>
+        <div class="map-space" id="map-space">
+          <svg
+            role="group"
+            aria-label="Directory terrain ranked by commit activity"
+            id="map"
+            viewBox="0 0 1000 660"
+          ></svg>
+        </div>
+        <div id="timeline" class="timeline" hidden>
+          <div class="timeline-header">
+            <label class="visually-hidden" for="search">Search commit subject, author, hash or path</label
+            ><input
+              id="search"
+              type="search"
+              placeholder="Search subject, author, hash, or path…"
+              autocomplete="off"
+            />
+          </div>
+          <div id="rows"></div>
+        </div>
+        <div class="map-lower">
+          <div class="transport" id="transport">
+            <div class="replay-line">
+              <button type="button" id="play" aria-label="Replay commit history">▷ Replay history</button
+              ><input
+                id="scrubber"
+                aria-label="Scrub commit history, oldest to newest"
+                type="range"
+                min="0"
+                value="0"
+              /><button type="button" id="exit-replay" aria-label="Exit commit replay" hidden>×</button>
+            </div>
+            <button type="button" id="frame-info" disabled></button>
+          </div>
+          <div class="legend">
+            <span id="legend-main"><i></i> Shared commits</span
+            ><span id="legend-extra">First-parent history · UTC</span>
+          </div>
+        </div>
+      </section>
+      <aside class="aside" aria-label="Repository and sector inspector">
+        <section class="aside-section">
+          <div class="survey-title">
+            <h2>Repository survey</h2>
+            <span class="tag">Overview</span>
+          </div>
+          <div class="survey-stats">
+            <div><b id="total"></b><small>commits</small></div>
+            <div><b id="sector-count"></b><small>sectors</small></div>
+            <div><b id="people"></b><small>authors</small></div>
+          </div>
+          <span class="range" id="range"></span>
+        </section>
+        <div id="aside">
+          <section class="aside-section">
+            <label for="sectors" class="small-label">Selected sector</label>
+            <div class="selector"><select id="sectors" aria-label="Inspect a directory sector"></select></div>
+            <div class="stat-pair">
+              <div><b id="touches"></b><small>commits</small></div>
+              <div><b id="file-count"></b><small>distinct paths</small></div>
+            </div>
+            <div class="spark" role="img" aria-label="Sector commit activity over the survey period">
+              <div class="bars" id="bars"></div>
+              <div class="axis"><span id="from"></span><span id="to"></span></div>
+            </div>
+          </section>
+          <section class="aside-section">
+            <div class="section-title">
+              <h2>Recent activity</h2>
+              <button type="button" id="open-log" class="log-btn">Sector log →</button>
+            </div>
+            <div class="commit-list" id="recent"></div>
+          </section>
+          <section class="aside-section">
+            <div class="section-title">
+              <h2>Sector index</h2>
+              <span class="small-label">Commits</span>
+            </div>
+            <div class="sector-ranks" id="ranks"></div>
+          </section>
+        </div>
+        <footer class="aside-foot">
+          <span id="provenance"></span
+          ><a href="https://github.com/saimeeee/patchbay-atlas#map-your-own-repository">Guide ↗</a>
+        </footer>
+      </aside>
+    </main>
+    <dialog id="details" aria-labelledby="detail-title">
+      <div class="modal-head">
+        <span class="small-label">Commit inspector</span
+        ><button id="close" class="close" aria-label="Close commit inspector">×</button>
+      </div>
+      <div class="modal-body">
+        <h2 id="detail-title"></h2>
+        <div class="metadata" id="detail-meta"></div>
+        <div class="facet-title" id="file-title"></div>
+        <ul class="files" id="files"></ul>
+      </div>
+    </dialog>
+
+    <!-- prettier-ignore -->
+    <script type="application/json" id="atlas-data"><!-- PATCHBAY_DATA --></script>
+    <script>
+      'use strict';
+      const data = JSON.parse(document.getElementById('atlas-data').textContent);
+      const $ = (id) => document.getElementById(id);
+      const NS = 'http://www.w3.org/2000/svg';
+      const make = (tag, cls, txt) => {
+        const el = document.createElement(tag);
+        if (cls) el.className = cls;
+        if (txt !== undefined) el.textContent = txt;
+        return el;
+      };
+      const svg = (tag, attrs, text) => {
+        const el = document.createElementNS(NS, tag);
+        for (const [name, value] of Object.entries(attrs)) el.setAttribute(name, value);
+        if (text !== undefined) el.textContent = text;
+        return el;
+      };
+      const pathSector = (path) => (path.includes('/') ? path.slice(0, path.indexOf('/')) : '');
+      const sectorLabel = (name) => (name ? name + '/' : '/ (root)');
+      const sectorMap = new Map();
+      const commits = data.commits;
+      for (const commit of commits) {
+        const touched = new Set();
+        for (const [path] of commit.files) {
+          const key = pathSector(path);
+          if (!sectorMap.has(key)) sectorMap.set(key, { name: key, paths: new Set(), commits: [] });
+          const item = sectorMap.get(key);
+          item.paths.add(path);
+          touched.add(item);
+        }
+        for (const item of touched) item.commits.push(commit);
+      }
+      const sectors = [...sectorMap.values()].sort(
+        (a, b) => b.commits.length - a.commits.length || (a.name < b.name ? -1 : a.name > b.name ? 1 : 0),
+      );
+      for (const [idx, s] of sectors.entries()) {
+        s.index = idx;
+        s.ids = new Set(s.commits.map((c) => c.id));
+      }
+      const timestamps = commits.map((c) => c.time);
+      const minTime = timestamps.reduce((a, b) => Math.min(a, b), Infinity);
+      const maxTime = timestamps.reduce((a, b) => Math.max(a, b), -Infinity);
+      function stamp(time, opts) {
+        if (!Number.isFinite(time)) return '—';
+        const date = new Date(time * 1000);
+        return Number.isNaN(+date)
+          ? 'Unknown date'
+          : new Intl.DateTimeFormat('en-US', { timeZone: 'UTC', ...opts }).format(date);
+      }
+      const dateLabel = (t) => stamp(t, { month: 'short', day: 'numeric', year: 'numeric' });
+      const shortDate = (t) => stamp(t, { month: 'short', day: 'numeric' });
+      const compact = (n) => n.toLocaleString('en-US');
+      const pageSize = 6;
+      let selected = sectors[0],
+        page = 0,
+        view = 'map',
+        filterSector = null;
+      const chronology = commits.slice().reverse();
+      let frame = -1,
+        replayTimer = null;
+      function pauseReplay() {
+        if (replayTimer !== null) clearInterval(replayTimer);
+        replayTimer = null;
+        $('play').textContent = frame < 0 ? '▷ Replay history' : '▷ Play';
+        $('play').setAttribute('aria-label', frame < 0 ? 'Replay commit history' : 'Play commit history');
+      }
+      function resetReplay() {
+        frame = -1;
+        pauseReplay();
+        $('scrubber').value = 0;
+        $('exit-replay').hidden = true;
+        $('frame-info').disabled = true;
+        $('frame-info').textContent = 'Scrub commits from oldest to newest.';
+        $('scrubber').setAttribute('aria-valuetext', 'Start of history');
+      }
+      function showFrame(index) {
+        const c = chronology[index];
+        if (!c) return;
+        frame = index;
+        const hit = sectors.filter((s) => s.ids.has(c.id));
+        if (hit.length && !hit.some((s) => Math.floor(s.index / pageSize) === page))
+          page = Math.floor(hit[0].index / pageSize);
+        const first = hit.find((s) => Math.floor(s.index / pageSize) === page);
+        if (first) {
+          selected = first;
+          $('sectors').value = String(first.index);
+          inspector();
+        }
+        $('scrubber').value = String(index);
+        $('exit-replay').hidden = false;
+        $('frame-info').disabled = false;
+        $('frame-info').textContent =
+          index +
+          1 +
+          ' / ' +
+          chronology.length +
+          ' · ' +
+          c.id.slice(0, 7) +
+          ' · ' +
+          (c.subject || '(empty subject)') +
+          ' ↗';
+        $('scrubber').setAttribute(
+          'aria-valuetext',
+          'Commit ' + (index + 1) + ' of ' + chronology.length + ': ' + c.subject,
+        );
+        drawMap();
+        navigation();
+      }
+      function startReplay() {
+        if (replayTimer !== null) {
+          pauseReplay();
+          return;
+        }
+        const next = frame < 0 || frame === chronology.length - 1 ? 0 : frame + 1;
+        showFrame(next);
+        if (next === chronology.length - 1) {
+          pauseReplay();
+          return;
+        }
+        $('play').textContent = 'Ⅱ Pause';
+        $('play').setAttribute('aria-label', 'Pause commit history');
+        replayTimer = setInterval(() => {
+          showFrame(frame + 1);
+          if (frame >= chronology.length - 1) pauseReplay();
+        }, 1050);
+      }
+      $('play').onclick = startReplay;
+      $('scrubber').max = String(Math.max(0, chronology.length - 1));
+      $('scrubber').oninput = () => {
+        pauseReplay();
+        showFrame(Number($('scrubber').value));
+      };
+      $('exit-replay').onclick = () => {
+        resetReplay();
+        drawMap();
+      };
+      $('frame-info').onclick = () => {
+        if (frame >= 0) openCommit(chronology[frame]);
+      };
+      $('transport').hidden = !chronology.length;
+      resetReplay();
+      $('mode').textContent = data.demo ? 'Demo atlas' : 'Local export';
+      $('repo').textContent = data.repo;
+      document.title = data.repo + ' · Patchbay Atlas';
+      $('ref').textContent = '⑂ ' + data.ref;
+      $('range').textContent = commits.length
+        ? dateLabel(minTime) + ' – ' + dateLabel(maxTime)
+        : 'No commits yet';
+      $('total').textContent = compact(commits.length);
+      $('sector-count').textContent = compact(sectors.length);
+      $('people').textContent = compact(new Set(commits.map((c) => c.author)).size);
+      $('provenance').textContent = data.demo ? 'Fictional demo history.' : 'Local export · UTC.';
+      for (const sector of sectors) {
+        const opt = make('option', '', sectorLabel(sector.name));
+        opt.value = String(sector.index);
+        $('sectors').append(opt);
+      }
+      function hash(str) {
+        let n = 2166136261;
+        for (const ch of str) n = Math.imul(n ^ ch.codePointAt(0), 16777619);
+        return n >>> 0;
+      }
+      // A continuous scalar field binds every sector on a sheet into one terrain.
+      // Marching squares traces the same elevation data used to place the summits.
+      const terrainCache = new Map();
+      function noise(x, y, seed) {
+        const value = (i, j) => {
+          let h = Math.imul(i, 374761393) + Math.imul(j, 668265263) + seed;
+          h = Math.imul(h ^ (h >>> 13), 1274126177);
+          return ((h ^ (h >>> 16)) >>> 0) / 4294967295;
+        };
+        const i = Math.floor(x),
+          j = Math.floor(y);
+        const smooth = (t) => t * t * (3 - 2 * t);
+        const a = smooth(x - i),
+          b = smooth(y - j);
+        return (
+          ((1 - a) * value(i, j) + a * value(i + 1, j)) * (1 - b) +
+          ((1 - a) * value(i, j + 1) + a * value(i + 1, j + 1)) * b
+        );
+      }
+      function reliefNoise(x, y, seed) {
+        return (
+          noise(x, y, seed) * 0.54 +
+          noise(x * 2 + 0.4, y * 2 + 3.1, seed + 13) * 0.27 +
+          noise(x * 4 + 2.1, y * 4 + 1.8, seed + 31) * 0.135 +
+          noise(x * 8, y * 8, seed + 51) * 0.055
+        );
+      }
+      function traceContour(values, cols, rows, level, width, height) {
+        const links = new Map(),
+          points = new Map();
+        const connect = (a, b) => {
+          if (!links.has(a)) links.set(a, []);
+          if (!links.has(b)) links.set(b, []);
+          links.get(a).push(b);
+          links.get(b).push(a);
+        };
+        for (let y = 0; y < rows - 1; y++)
+          for (let x = 0; x < cols - 1; x++) {
+            const a = y * cols + x,
+              corners = [a, a + 1, a + cols + 1, a + cols];
+            const mask = corners.reduce((bits, idx, k) => bits | ((values[idx] >= level ? 1 : 0) << k), 0);
+            if (mask === 0 || mask === 15) continue;
+            const edges = [];
+            for (let i = 0; i < 4; i++) {
+              const u = corners[i],
+                v = corners[(i + 1) % 4];
+              if (values[u] >= level === values[v] >= level) continue;
+              const key = Math.min(u, v) * 2 + (Math.abs(u - v) === 1 ? 0 : 1);
+              edges.push(key);
+              if (!points.has(key)) {
+                const part = (level - values[u]) / (values[v] - values[u]);
+                const px = (((u % cols) + part * ((v % cols) - (u % cols))) * width) / (cols - 1);
+                const py =
+                  ((Math.floor(u / cols) + part * (Math.floor(v / cols) - Math.floor(u / cols))) * height) /
+                  (rows - 1);
+                points.set(key, px.toFixed(1) + ' ' + py.toFixed(1));
+              }
+            }
+            if (edges.length === 2) connect(edges[0], edges[1]);
+            else if (edges.length === 4) {
+              const center = corners.reduce((s, i) => s + values[i], 0) / 4;
+              const swap = (mask === 5) === center >= level;
+              connect(edges[0], edges[swap ? 1 : 3]);
+              connect(edges[2], edges[swap ? 3 : 1]);
+            }
+          }
+        const seen = new Set(),
+          paths = [];
+        for (const start of links.keys()) {
+          if (seen.has(start)) continue;
+          let at = start,
+            prev = -1;
+          const ring = [];
+          while (!seen.has(at)) {
+            seen.add(at);
+            ring.push(points.get(at));
+            const next = links.get(at).find((v) => v !== prev);
+            if (next === undefined) break;
+            prev = at;
+            at = next;
+          }
+          if (ring.length > 3) paths.push('M' + ring.join('L') + 'Z');
+        }
+        return paths.join('');
+      }
+      function mixColor(stops, t) {
+        const pos = Math.min(stops.length - 1, Math.max(0, t) * (stops.length - 1));
+        const a = stops[Math.floor(pos)],
+          b = stops[Math.ceil(pos)],
+          v = pos - Math.floor(pos);
+        const rgb = [0, 1, 2].map((i) =>
+          Math.round(
+            parseInt(a.slice(i * 2, i * 2 + 2), 16) * (1 - v) + parseInt(b.slice(i * 2, i * 2 + 2), 16) * v,
+          ),
+        );
+        return 'rgb(' + rgb.join(',') + ')';
+      }
+      function buildTerrain(items, slots, w, h) {
+        const terrain = svg('g', { 'aria-hidden': 'true' });
+        const seed = hash(data.repo + '-' + items.map((s) => s.name).join('/'));
+        const cols = w < 600 ? 91 : 142,
+          rows = Math.max(70, Math.round((cols * h) / w));
+        const vals = new Float32Array(cols * rows);
+        for (let j = 0; j < rows; j++)
+          for (let i = 0; i < cols; i++) {
+            const x = i / (cols - 1),
+              y = j / (rows - 1);
+            const bendX = (reliefNoise(x * 3, y * 3, seed) - 0.5) * 0.22;
+            const bendY = (reliefNoise(x * 3 + 11, y * 3 + 5, seed + 47) - 0.5) * 0.23;
+            const u = x + bendX,
+              v = y + bendY;
+            let activity = 0,
+              largest = 0;
+            for (let k = 0; k < items.length; k++) {
+              const [cx, cy] = slots[k],
+                dx = u - cx,
+                dy = v - cy;
+              const tilt = k % 2 ? -0.43 : 0.48;
+              const xx = (dx + tilt * dy) / (0.143 + 0.014 * (k % 3)),
+                yy = (dy - tilt * dx) / (0.115 + 0.01 * (k % 2));
+              const amplitude = 0.62 + 0.37 * Math.sqrt(items[k].commits.length / items[0].commits.length);
+              const bump = Math.exp(-(xx * xx + yy * yy) * 0.83) * amplitude;
+              activity += bump;
+              largest = Math.max(largest, bump);
+            }
+            const detail = (reliefNoise(x * 7 + 2, y * 7 + 4, seed + 121) - 0.48) * 0.43;
+            const shelf = 0.082 * Math.exp(-((x - 0.5) ** 2 / 0.19 + (y - 0.5) ** 2 / 0.13));
+            const edge = Math.min(1, Math.min(x, y, 1 - x, 1 - y) / 0.075);
+            vals[j * cols + i] = Math.max(0, (activity * 0.35 + largest * 0.65 + shelf + detail) * edge);
+          }
+        const colors = ['f8fafc', 'e7edf4', 'd5e1ef', 'c5d4e8', 'b5c6e1', 'a6b6d6', '95a6cc', '8598c3'];
+        for (let step = 0; step < 44; step++) {
+          const level = 0.045 + step * 0.024,
+            path = traceContour(vals, cols, rows, level, w, h);
+          if (!path) continue;
+          const sea = step < 5,
+            coast = step === 5;
+          const fill = sea
+            ? mixColor(['e4eff8', 'dcebf5', 'd2e4f1'], step / 4)
+            : mixColor(colors, (step - 5) / 38);
+          terrain.append(
+            svg('path', {
+              d: path,
+              fill,
+              'fill-rule': 'evenodd',
+              stroke: coast ? '#567eaa' : sea ? '#99b5ce' : step % 4 === 1 ? '#5e77a2' : '#7d93b6',
+              'stroke-opacity': coast ? 0.97 : sea ? 0.59 : 0.62,
+              'stroke-width': coast ? 1.2 : step % 4 === 1 ? 0.78 : 0.48,
+              'stroke-linejoin': 'round',
+            }),
+          );
+        }
+        // NW-facing slopes catch the light; opposite slopes give valleys their depth.
+        const raster = document.createElement('canvas');
+        raster.width = cols;
+        raster.height = rows;
+        const context = raster.getContext('2d'),
+          pixels = context.createImageData(cols, rows);
+        for (let j = 1; j < rows - 1; j++)
+          for (let i = 1; i < cols - 1; i++) {
+            const k = j * cols + i,
+              z = vals[k];
+            if (z < 0.15) continue;
+            const dx = ((vals[k + 1] - vals[k - 1]) * cols) / w,
+              dy = ((vals[k + cols] - vals[k - cols]) * rows) / h;
+            const light = Math.max(-1, Math.min(1, (dx * 0.6 + dy * 0.8) * 112));
+            const tone = light > 0 ? [255, 255, 255] : [39, 65, 118];
+            const pixel = k * 4;
+            for (let channel = 0; channel < 3; channel++) pixels.data[pixel + channel] = tone[channel];
+            pixels.data[pixel + 3] = Math.round(Math.abs(light) * 64 * Math.min(1, (z - 0.15) * 8));
+          }
+        context.putImageData(pixels, 0, 0);
+        terrain.append(
+          svg('image', {
+            x: 0,
+            y: 0,
+            width: w,
+            height: h,
+            href: raster.toDataURL('image/png'),
+            preserveAspectRatio: 'none',
+          }),
+        );
+        return terrain;
+      }
+      function drawMap() {
+        const map = $('map'),
+          pane = $('map-space');
+        const mobile = window.matchMedia('(max-width:720px)').matches;
+        const w = mobile ? 430 : 1000;
+        const ratio = pane.clientHeight / Math.max(1, pane.clientWidth);
+        const h = Math.max(410, Math.min(1200, Math.round(w * ratio) || 650));
+        map.setAttribute('viewBox', '0 0 ' + w + ' ' + h);
+        map.replaceChildren();
+        const items = sectors.slice(page * pageSize, (page + 1) * pageSize);
+        let slots = mobile
+          ? [
+              [0.3, 0.32],
+              [0.67, 0.26],
+              [0.7, 0.52],
+              [0.34, 0.56],
+              [0.64, 0.74],
+              [0.22, 0.76],
+            ]
+          : [
+              [0.27, 0.38],
+              [0.53, 0.26],
+              [0.76, 0.53],
+              [0.45, 0.62],
+              [0.79, 0.28],
+              [0.21, 0.73],
+            ];
+        if (items.length === 1) slots = [[0.5, 0.49]];
+        if (items.length === 2)
+          slots = [
+            [0.36, 0.4],
+            [0.64, 0.59],
+          ];
+        if (items.length === 3)
+          slots = [
+            [0.27, 0.43],
+            [0.56, 0.33],
+            [0.67, 0.63],
+          ];
+        $('map-index').textContent =
+          'SHEET ' +
+          String(page + 1).padStart(2, '0') +
+          ' / ' +
+          String(Math.max(1, Math.ceil(sectors.length / pageSize))).padStart(2, '0');
+        if (!items.length) {
+          map.append(
+            svg(
+              'text',
+              {
+                x: w / 2,
+                y: h / 2,
+                'text-anchor': 'middle',
+                fill: '#3b526f',
+                'font-family': 'sans-serif',
+                'font-size': 16,
+              },
+              commits.length
+                ? 'These commits contain no changed paths.'
+                : 'Commit a change to chart your first sector.',
+            ),
+          );
+          return;
+        }
+        const key = w + '/' + h + '/' + page;
+        if (!terrainCache.has(key)) {
+          if (terrainCache.size >= 4) terrainCache.clear();
+          terrainCache.set(key, buildTerrain(items, slots, w, h));
+        }
+        map.append(terrainCache.get(key).cloneNode(true));
+        const grid = svg('g', { 'aria-hidden': 'true' });
+        const margin = mobile ? 12 : 18,
+          steps = mobile ? 4 : 6;
+        for (let i = 0; i < steps; i++) {
+          const x = ((i + 0.5) * w) / steps;
+          grid.append(
+            svg('path', {
+              d: 'M' + x + ' ' + margin + 'V' + (h - margin),
+              fill: 'none',
+              stroke: '#7796b4',
+              'stroke-width': 0.5,
+              'stroke-dasharray': '1 5',
+              opacity: 0.25,
+            }),
+          );
+          grid.append(
+            svg(
+              'text',
+              {
+                x,
+                y: h * 0.9,
+                'text-anchor': 'middle',
+                'font-family': 'monospace',
+                'font-size': 9,
+                fill: '#3f6586',
+                opacity: 0.8,
+              },
+              String.fromCharCode(65 + i),
+            ),
+          );
+        }
+        for (let j = 1; j <= 4; j++) {
+          const y = (0.08 + j * 0.165) * h;
+          grid.append(
+            svg('path', {
+              d: 'M' + margin + ' ' + y + 'H' + (w - margin),
+              fill: 'none',
+              stroke: '#7796b4',
+              'stroke-width': 0.5,
+              'stroke-dasharray': '1 5',
+              opacity: 0.25,
+            }),
+          );
+          grid.append(
+            svg(
+              'text',
+              {
+                x: margin,
+                y: y - 5,
+                'font-family': 'monospace',
+                'font-size': 9,
+                fill: '#3f6586',
+                opacity: 0.8,
+              },
+              '0' + j,
+            ),
+          );
+        }
+        map.append(grid);
+        const routes = [];
+        for (let i = 0; i < items.length; i++)
+          for (let j = i + 1; j < items.length; j++) {
+            let n = 0;
+            for (const id of items[i].ids) if (items[j].ids.has(id)) n++;
+            if (n) routes.push([i, j, n]);
+          }
+        for (const [i, j, n] of routes.sort((a, b) => b[2] - a[2]).slice(0, 8)) {
+          const [x, y] = slots[i],
+            [xx, yy] = slots[j];
+          const highlighted = frame >= 0
+            ? items[i].ids.has(chronology[frame].id) && items[j].ids.has(chronology[frame].id)
+            : items[i] === selected || items[j] === selected;
+          const route = svg('path', {
+            d:
+              'M' +
+              x * w +
+              ' ' +
+              y * h +
+              'Q' +
+              (((x + xx) * w) / 2 + 12) +
+              ' ' +
+              (((y + yy) * h) / 2 - 26) +
+              ' ' +
+              xx * w +
+              ' ' +
+              yy * h,
+            fill: 'none',
+            stroke: highlighted ? '#bc493d' : '#465f8c',
+            'stroke-opacity': highlighted ? 0.82 : 0.5,
+            'stroke-width': highlighted ? 1.45 : 1.05,
+            'stroke-dasharray': '3 5',
+          });
+          route.append(svg('title', {}, n + ' shared commits'));
+          map.append(route);
+        }
+        items.forEach((s, i) => {
+          const c = selected === s,
+            active = frame < 0 || s.ids.has(chronology[frame].id);
+          const [x, y] = slots[i].map((v, k) => v * (k ? h : w));
+          const group = svg('g', {
+            class: 'island',
+            role: 'button',
+            tabindex: 0,
+            'aria-pressed': c,
+            'aria-label': sectorLabel(s.name) + ', ' + s.commits.length + ' commits',
+            opacity: active ? 1 : 0.47,
+          });
+          const ink = c || (frame >= 0 && active) ? '#9e2c22' : '#14294d';
+          group.append(svg('title', {}, sectorLabel(s.name) + ' · ' + s.commits.length + ' commits'));
+          group.append(svg('circle', { cx: x, cy: y, r: mobile ? 34 : 46, fill: 'transparent' }));
+          if (c || (frame >= 0 && active))
+            group.append(
+              svg('circle', {
+                cx: x,
+                cy: y,
+                r: 12,
+                fill: '#fffdfa',
+                'fill-opacity': 0.45,
+                stroke: '#c44331',
+                'stroke-width': 1.6,
+              }),
+            );
+          group.append(
+            svg('circle', {
+              class: 'pin',
+              cx: x,
+              cy: y,
+              r: c ? 4.7 : 3.5,
+              fill: ink,
+              stroke: '#fffdf6',
+              'stroke-width': 1.5,
+            }),
+          );
+          const full = sectorLabel(s.name),
+            label = full.length > 19 ? full.slice(0, 17) + '…/' : full;
+          const labelY = y + (mobile ? 27 : 33);
+          const textStyle = {
+            'text-anchor': 'middle',
+            'font-family': 'Segoe UI,Arial,sans-serif',
+            'paint-order': 'stroke',
+            stroke: '#f9fbff',
+            'stroke-width': 2.5,
+            'stroke-linejoin': 'round',
+          };
+          group.append(
+            svg(
+              'text',
+              {
+                ...textStyle,
+                x,
+                y: labelY,
+                fill: ink,
+                'font-size': mobile ? 18 : c ? 26 : 21,
+                'font-weight': 600,
+                'letter-spacing': -0.6,
+              },
+              label,
+            ),
+          );
+          group.append(
+            svg(
+              'text',
+              {
+                ...textStyle,
+                x,
+                y: labelY + (mobile ? 14 : 16),
+                fill: '#182e50',
+                'font-size': mobile ? 13 : 12,
+                'font-family': 'monospace',
+                'stroke-width': 2,
+              },
+              s.commits.length + ' commits',
+            ),
+          );
+          const hit = svg('rect', {
+            x: x - Math.max(37, label.length * 5),
+            y: y + 10,
+            width: Math.max(74, label.length * 10),
+            height: 48,
+            fill: 'transparent',
+          });
+          group.append(hit);
+          group.addEventListener('click', () => selectSector(s));
+          group.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+              e.preventDefault();
+              selectSector(s);
+              map.querySelector('[aria-pressed="true"]')?.focus();
+            }
+          });
+          map.append(group);
+        });
+      }
+
+      function selectSector(s) {
+        resetReplay();
+        selected = s;
+        page = Math.floor(s.index / pageSize);
+        $('sectors').value = String(s.index);
+        if (view === 'log' && filterSector !== null) {
+          filterSector = s;
+          renderRows();
+        }
+        drawMap();
+        inspector();
+        navigation();
+      }
+      function navigation() {
+        const pages = Math.max(1, Math.ceil(sectors.length / pageSize));
+        $('sheet').textContent = page + 1 + ' / ' + pages;
+        $('nav').hidden = view !== 'map' || pages === 1;
+        $('map-index').hidden = view !== 'map' || pages !== 1;
+        $('prev').disabled = page === 0;
+        $('next').disabled = page + 1 >= pages;
+      }
+      function inspector() {
+        if (!selected) {
+          $('aside').hidden = true;
+          return;
+        }
+        const s = selected;
+        $('ranks').replaceChildren();
+        for (const item of sectors.slice(page * pageSize, (page + 1) * pageSize)) {
+          const btn = make('button', 'sector-row');
+          btn.setAttribute('aria-pressed', String(s === item));
+          const track = make('span', 'rank-track'),
+            bar = make('i');
+          bar.style.width = Math.round((100 * item.commits.length) / sectors[0].commits.length) + '%';
+          track.append(bar);
+          btn.append(make('span', '', sectorLabel(item.name)), track, make('span', '', item.commits.length));
+          btn.onclick = () => selectSector(item);
+          $('ranks').append(btn);
+        }
+        $('touches').textContent = compact(s.commits.length);
+        $('file-count').textContent = compact(s.paths.size);
+        const bins = Array(28).fill(0),
+          span = Math.max(1, maxTime - minTime);
+        for (const c of s.commits) bins[Math.min(27, Math.floor(((c.time - minTime) / span) * 28))]++;
+        const peak = Math.max(...bins, 1);
+        $('bars').replaceChildren();
+        for (const hits of bins) {
+          const bar = make('i');
+          bar.style.height = (hits ? Math.max(9, Math.round((hits / peak) * 100)) : 3) + '%';
+          bar.title = hits + ' commits';
+          $('bars').append(bar);
+        }
+        $('from').textContent = shortDate(minTime);
+        $('to').textContent = shortDate(maxTime);
+        $('recent').replaceChildren();
+        for (const c of s.commits.slice(0, 3)) {
+          const btn = make('button', 'commit-btn');
+          btn.type = 'button';
+          btn.append(
+            make('span', 'subject', c.subject || '(empty subject)'),
+            make('span', 'hash', c.id.slice(0, 7) + ' · ' + shortDate(c.time)),
+          );
+          btn.onclick = () => openCommit(c);
+          $('recent').append(btn);
+        }
+      }
+      function renderRows() {
+        const query = $('search').value.trim().toLowerCase(),
+          source = filterSector === null ? commits : filterSector.commits;
+        const matches = query
+          ? source.filter((c) =>
+              [c.subject, c.author, c.id, ...c.files.map((f) => f[0])].some((v) =>
+                v.toLowerCase().includes(query),
+              ),
+            )
+          : source;
+        $('view-title').textContent =
+          filterSector === null ? 'Commit log' : sectorLabel(filterSector.name) + ' log';
+        $('legend-main').textContent = compact(matches.length) + ' matching commits';
+        $('legend-extra').textContent = 'Commit dates in UTC';
+        $('rows').replaceChildren();
+        if (!matches.length) $('rows').append(make('p', 'empty', 'No matching commits.'));
+        let offset = 0;
+        function more() {
+          const batch = document.createDocumentFragment();
+          for (const c of matches.slice(offset, offset + 80)) {
+            const row = make('button', 'time-row');
+            row.type = 'button';
+            row.append(
+              make('span', 'subtle', shortDate(c.time)),
+              make('span', 'subject', c.subject || '(empty subject)'),
+              make('span', 'hash', c.id.slice(0, 7)),
+            );
+            row.onclick = () => openCommit(c);
+            batch.append(row);
+          }
+          offset += 80;
+          $('rows').append(batch);
+          if (offset < matches.length) {
+            const btn = make('button', 'log-btn', 'Load more commits ↓');
+            btn.onclick = () => {
+              btn.remove();
+              more();
+            };
+            $('rows').append(btn);
+          }
+        }
+        more();
+      }
+      function setView(next, sector = null) {
+        resetReplay();
+        $('transport').hidden = next !== 'map' || !chronology.length;
+        view = next;
+        filterSector = sector;
+        $('terrain-btn').setAttribute('aria-pressed', String(view === 'map'));
+        $('time-btn').setAttribute('aria-pressed', String(view === 'log'));
+        $('export').hidden = view !== 'map';
+        $('map-space').hidden = view !== 'map';
+        $('timeline').hidden = view !== 'log';
+        $('search').value = '';
+        if (view === 'map') {
+          $('view-title').textContent = 'Sector map';
+          $('legend-main').replaceChildren(make('i'), document.createTextNode(' Shared commits'));
+          $('legend-extra').textContent = 'First-parent history · UTC';
+          drawMap();
+        } else {
+          renderRows();
+          $('timeline').scrollTop = 0;
+        }
+        navigation();
+      }
+      function downloadMap() {
+        const liveMap = $('map'),
+          bounds = liveMap.viewBox.baseVal;
+        const width = bounds.width,
+          header = 99,
+          footer = 47,
+          height = bounds.height + header + footer;
+        const art = svg('svg', {
+          viewBox: '0 0 ' + width + ' ' + height,
+          width,
+          height,
+          role: 'img',
+          'aria-labelledby': 'sheet-title sheet-desc',
+        });
+        art.append(svg('title', { id: 'sheet-title' }, data.repo + ' · Patchbay Atlas'));
+        art.append(
+          svg(
+            'desc',
+            { id: 'sheet-desc' },
+            'Directory map of ' +
+              data.repo +
+              ' on ' +
+              data.ref +
+              '. Dashed routes mark shared commits. Sheet ' +
+              (page + 1) +
+              '.',
+          ),
+        );
+        const defs = svg('defs', {}),
+          dots = svg('pattern', { id: 'dots', width: 14, height: 14, patternUnits: 'userSpaceOnUse' });
+        dots.append(svg('circle', { cx: 4, cy: 4, r: 0.6, fill: '#b0c5da' }));
+        defs.append(dots);
+        art.append(defs);
+        art.append(svg('rect', { width, height, fill: '#e8f1f8' }));
+        const label = (x, y, value, size, color, font) =>
+          svg('text', { x, y, fill: color, 'font-family': font || 'monospace', 'font-size': size }, value);
+        art.append(
+          label(
+            19,
+            23,
+            'PATCHBAY ATLAS  /  ' + (data.demo ? 'DEMO SURVEY' : 'REPOSITORY SURVEY'),
+            10,
+            '#355789',
+          ),
+        );
+        const measure = document.createElement('canvas').getContext('2d');
+        const fit = (value, font, maxWidth) => {
+          measure.font = font;
+          if (measure.measureText(value).width <= maxWidth) return value;
+          const chars = Array.from(value);
+          while (chars.length && measure.measureText(chars.join('') + '…').width > maxWidth) chars.pop();
+          return chars.join('') + '…';
+        };
+        const titleSize = width < 500 ? 29 : 36;
+        const title = fit(data.repo, titleSize + 'px Georgia,serif', width - 40);
+        art.append(label(18, 60, title, titleSize, '#1f365c', 'Georgia,serif'));
+        const ref = data.ref.length > 24 ? data.ref.slice(0, 22) + '…' : data.ref;
+        const dates = commits.length ? shortDate(minTime) + ' – ' + dateLabel(maxTime) : 'No commits yet';
+        art.append(
+          label(
+            20,
+            82,
+            fit(ref + '  /  ' + dates + '  /  ' + commits.length + ' commits', '10px monospace', width - 40),
+            10,
+            '#435c79',
+          ),
+        );
+        art.append(svg('rect', { x: 0, y: header, width, height: bounds.height, fill: 'url(#dots)' }));
+        const terrain = svg('g', { transform: 'translate(0 ' + header + ')' });
+        for (const node of liveMap.children) terrain.append(node.cloneNode(true));
+        for (const node of terrain.querySelectorAll('.label-shadow')) {
+          node.setAttribute('paint-order', 'stroke');
+          node.setAttribute('stroke', '#fffefa');
+          node.setAttribute('stroke-width', 5);
+          node.setAttribute('stroke-linejoin', 'round');
+        }
+        for (const node of terrain.querySelectorAll('[tabindex]')) {
+          node.removeAttribute('tabindex');
+          node.removeAttribute('role');
+          node.removeAttribute('aria-pressed');
+        }
+        art.append(terrain);
+        for (const y of [header - 1, height - footer + 1])
+          art.append(svg('path', { d: 'M0 ' + y + 'h' + width, stroke: '#abc0d2' }));
+        art.append(
+          svg('path', { d: 'M20 ' + (height - 21) + 'h21', stroke: '#546e91', 'stroke-dasharray': '3 4' }),
+        );
+        art.append(
+          label(
+            48,
+            height - 17,
+            'Shared commits' + (frame >= 0 ? ' · ' + chronology[frame].id.slice(0, 7) + ' highlighted' : ''),
+            10,
+            '#435c79',
+          ),
+        );
+        const sheet = 'Sheet ' + (page + 1) + ' / ' + Math.max(1, Math.ceil(sectors.length / pageSize));
+        const sheetLabel = label(width - 20, height - 17, sheet, 10, '#435c79');
+        sheetLabel.setAttribute('text-anchor', 'end');
+        art.append(sheetLabel);
+        const blob = new Blob([new XMLSerializer().serializeToString(art)], {
+          type: 'image/svg+xml;charset=utf-8',
+        });
+        const url = URL.createObjectURL(blob),
+          link = make('a');
+        link.href = url;
+        link.download =
+          (data.repo.replace(/[^a-zA-Z0-9_-]+/g, '-').slice(0, 64) || 'repo') + '-map-' + (page + 1) + '.svg';
+        document.body.append(link);
+        link.click();
+        link.remove();
+        setTimeout(() => URL.revokeObjectURL(url), 30000);
+      }
+      $('export').onclick = downloadMap;
+      function openCommit(c) {
+        pauseReplay();
+        $('detail-title').textContent = c.subject || '(empty subject)';
+        $('detail-meta').textContent =
+          c.id.slice(0, 12) + ' · ' + c.author + ' · ' + dateLabel(c.time) + ' UTC';
+        $('file-title').textContent =
+          compact(c.files.length) + ' changed ' + (c.files.length === 1 ? 'path' : 'paths');
+        $('files').replaceChildren();
+        for (const [path, a, d] of c.files) {
+          const li = make('li');
+          li.append(
+            make('span', '', path),
+            make('span', 'delta', a === null ? 'binary' : '+' + a + ' / −' + d),
+          );
+          $('files').append(li);
+        }
+        $('details').showModal();
+      }
+      $('close').onclick = () => $('details').close();
+      $('details').addEventListener('click', (e) => {
+        if (e.target === $('details')) {
+          const r = e.target.getBoundingClientRect();
+          if (e.clientX < r.left || e.clientX > r.right || e.clientY < r.top || e.clientY > r.bottom)
+            e.target.close();
+        }
+      });
+      $('terrain-btn').onclick = () => setView('map');
+      $('time-btn').onclick = () => setView('log');
+      $('open-log').onclick = () => setView('log', selected);
+      $('search').oninput = renderRows;
+      $('sectors').onchange = () => selectSector(sectors[Number($('sectors').value)]);
+      $('prev').onclick = () => selectSector(sectors[(page - 1) * pageSize]);
+      $('next').onclick = () => selectSector(sectors[(page + 1) * pageSize]);
+      new ResizeObserver(() => {
+        if (view === 'map') drawMap();
+      }).observe($('map-space'));
+      drawMap();
+      inspector();
+      navigation();
+    </script>
+  </body>
+</html>
